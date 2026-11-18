@@ -77,7 +77,7 @@ All pages share the same controls: a date range, quick period buttons (**7D, 30D
 
 The Power BI model sits on top of a **mart layer** and uses a **fact constellation** design: five fact tables at different grains share the same conformed dimensions, so one slicer (date, shop, product, warehouse) filters every visual consistently.
 
-**Core star: the main sales fact**
+**Core star: the main sales fact** (the other four fact tables follow the same star pattern; see the bus matrix below)
 
 ```mermaid
 flowchart TB
@@ -103,9 +103,9 @@ flowchart TB
 | `mart_sku_demand_daily` | ✓ | ✓ | ✓ | ✓ |
 | `mart_inventory_daily` | ✓ |  | ✓ | ✓ |
 | `mart_orders` | ✓ | ✓ |  | ✓ |
-| `mart_order_lines` | ✓ created (active)<br/>✓ delivered (inactive) | ✓ | ✓ |  |
+| `mart_order_lines` | ✓ (created date) | ✓ | ✓ | ✓ |
 
-All dimension → fact relationships are one-to-many, single direction. `Group_by` → `mart_dim_date` is many-to-one with both-direction filtering, and `mart_orders` → `mart_order_lines` is one-to-many.
+All dimension → fact relationships are one-to-many, single direction. `Group_by` → `mart_dim_date` is many-to-one with both-direction filtering. Order-level facts are always filtered through the shared dimensions, so `mart_orders` → `mart_order_lines` is kept as an **inactive** relationship to avoid ambiguous filter paths.
 
 **Fact tables**
 
@@ -117,7 +117,6 @@ All dimension → fact relationships are one-to-many, single direction. `Group_b
 | `mart_order_lines` | 1 row per order line | Line-level flags: combo, free item, counts as demand, counts as revenue; created and delivered dates |
 | `mart_inventory_daily` | date × product × warehouse | Available, holding and damaged stock, **days of cover**, negative-stock flag |
 
-`mart_orders` → `mart_order_lines` is a one-to-many relationship on the order, so order-level attributes (carrier, city, COD) can be analysed together with line-level product data.
 
 **Dimension and helper tables**
 
@@ -133,7 +132,7 @@ All dimension → fact relationships are one-to-many, single direction. `Group_b
 
 - **Daily aggregated marts instead of raw orders** for the main visuals keep the model small and the report fast; order-level tables are kept only for drill-down.
 - **Combos are exploded into component SKUs** (`qty_demand_unit_from_combo`), so the demand of each physical product is not underestimated when it is sold inside a bundle.
-- **Role-playing date:** order lines relate to the calendar on both created date (active) and delivered date (inactive, activated with `USERELATIONSHIP` only in measures that need it).
+- **One date logic:** every fact is joined to the calendar on its main date (order created date, snapshot date), so the period buttons and the previous-period comparison behave the same on every visual.
 - **Clear business flags** (`is_demand`, `is_revenue`, `is_free_item`, `is_sellable_depot`) are computed upstream, so DAX measures stay simple and every report uses the same definitions.
 
 **Data source (original project):** orders and inventory pulled from the **Nhanh.vn API** (the order management system that consolidates all marketplace and internal orders), transformed into mart tables and refreshed **automatically**.
